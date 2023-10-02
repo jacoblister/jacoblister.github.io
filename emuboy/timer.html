@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<body>
+    <canvas id="glcanvas" width="160" height="144"></canvas><br/>
+    <button id="pocket">Pocket Demo</button><br/>
+    <button id="dangan">Dangan</button><br/>
+    <button id="wordyl">Wordyl</button><br/>
+    <div>or</div>    
+    <input id="rom" type="file" />
+</body>
+<script src="./gameboy.js"></script>
+<script>
+    var audioContext
+
+    const canvas = document.getElementById("glcanvas")
+    const ctx = canvas.getContext("2d")
+    const DISPLAY_WIDTH = 160
+    const DISPLAY_HEIGHT = 144
+
+    let gameboy = new GameBoy()
+
+    async function loadRom(filename) {
+        audioContext.resume()
+        let response = await fetch(filename)
+        let blob = await response.blob()
+        let arrayBuffer = await new Response(blob).arrayBuffer()
+        var uint8View = new Uint8Array(arrayBuffer)
+        gameboy.loadRom(uint8View)
+    }
+    
+    document.getElementById('pocket').addEventListener('click', function () { loadRom("pocket.gb") })
+    document.getElementById('dangan').addEventListener('click', function () { loadRom("dangan.gb") })
+    document.getElementById('wordyl').addEventListener('click', function () { loadRom("wordyl.gb") })
+
+    document.getElementById('rom').addEventListener('change', function () {
+        audioContext.resume()
+        var reader = new FileReader();
+        reader.onload = function () {
+            var arrayBuffer = this.result;
+            var uint8View = new Uint8Array(arrayBuffer);
+            console.log(arrayBuffer);
+            console.log(uint8View[0]);
+            gameboy.loadRom(uint8View)
+        }
+        reader.readAsArrayBuffer(this.files[0]);
+    }, false);
+
+    const imageData = ctx.createImageData(DISPLAY_WIDTH, DISPLAY_WIDTH)
+    vBuffer = new Uint32Array(imageData.data.buffer)
+    aBuffer = []
+    samplesPerFrame = 800
+    sampleCount = samplesPerFrame
+
+    let frameNumber = 0
+    let frameTimeStamp = 0
+
+    let lastFrame = performance.now()
+    function frame() {
+        nextFrameTimeStamp = performance.now()
+        let frameTime = nextFrameTimeStamp - frameTimeStamp
+        if (frameTime < 16 || frameTime > 18)
+        frameTimeStamp = nextFrameTimeStamp
+    
+        frameNumber = frameNumber + 1
+
+        buffer = []
+        gameboy.advanceFrame(vBuffer, sampleCount, buffer)
+        if (buffer.length == sampleCount && aBuffer.length < 4096) {
+            aBuffer = aBuffer.concat(buffer)
+        }
+
+        ctx.putImageData(imageData, 0, 0)
+
+        nextFrame = lastFrame + (1000 / 60)
+        lastFrame = nextFrame
+        setTimeout(frame, nextFrame - performance.now())
+    }
+    setTimeout(frame, 0)
+
+    window.onload = async function () {
+        audioContext = new AudioContext();
+        samplesPerFrame = audioContext.sampleRate / 60
+
+        console.log(document.getElementById("glcanvas"));
+
+        // One-liner to resume playback when user interacted with the page.
+        document.getElementById("glcanvas").addEventListener("click", function () {
+            audioContext.resume().then(() => {
+                console.log("Playback resumed successfully");
+            })
+        })
+
+        var frameLength = 2048
+        gameboy.audioSampleRate = audioContext.sampleRate
+        console.log("start audio: ", audioContext.sampleRate);
+
+        var node = audioContext.createScriptProcessor(frameLength, 2, 2)
+        node.onaudioprocess = function (event) {
+            var sampleBuffer = [
+                new Float32Array(Array(frameLength).fill(0)),
+                new Float32Array(Array(frameLength).fill(0))
+            ];
+
+            var output = event.outputBuffer.getChannelData(0)
+
+            for (let i = 0; i < frameLength; i++) {
+                sampleBuffer[0][i] = aBuffer[i]
+                sampleBuffer[1][i] = aBuffer[i]
+            }
+            aBuffer = aBuffer.slice(frameLength, aBuffer.length)
+            sampleCount = samplesPerFrame
+            if (aBuffer.length < frameLength >> 1) {
+                sampleCount = samplesPerFrame + 1
+            }
+            if (aBuffer.length > frameLength >> 1) {
+                sampleCount = samplesPerFrame - 1
+            }
+            event.outputBuffer.copyToChannel(sampleBuffer[0], 0)
+            event.outputBuffer.copyToChannel(sampleBuffer[1], 1)
+        };
+        node.connect(audioContext.destination)
+
+        console.log("Running process");
+    };
+
+    function keyDownHandler(evt) {
+        if (evt.keyCode == 39) { gameboy.buttonEvent(0, 1) }
+        if (evt.keyCode == 37) { gameboy.buttonEvent(1, 1) }
+        if (evt.keyCode == 38) { gameboy.buttonEvent(2, 1) }
+        if (evt.keyCode == 40) { gameboy.buttonEvent(3, 1) }
+        if (evt.keyCode == 83) { gameboy.buttonEvent(4, 1) }
+        if (evt.keyCode == 65) { gameboy.buttonEvent(5, 1) }
+        if (evt.keyCode == 32) { gameboy.buttonEvent(6, 1) }
+        if (evt.keyCode == 13) { gameboy.buttonEvent(7, 1) }
+    }
+    function keyUpHandler(evt) {
+        if (evt.keyCode == 39) { gameboy.buttonEvent(0, 0) }
+        if (evt.keyCode == 37) { gameboy.buttonEvent(1, 0) }
+        if (evt.keyCode == 38) { gameboy.buttonEvent(2, 0) }
+        if (evt.keyCode == 40) { gameboy.buttonEvent(3, 0) }
+        if (evt.keyCode == 83) { gameboy.buttonEvent(4, 0) }
+        if (evt.keyCode == 65) { gameboy.buttonEvent(5, 0) }
+        if (evt.keyCode == 32) { gameboy.buttonEvent(6, 0) }
+        if (evt.keyCode == 13) { gameboy.buttonEvent(7, 0) }
+    }
+    document.addEventListener("keydown", keyDownHandler, false);
+    document.addEventListener("keyup", keyUpHandler, false);
+</script>
+
+</html>
