@@ -49,18 +49,6 @@
         reader.readAsArrayBuffer(this.files[0]);
     }, false);
 
-    // document.getElementById('rom').addEventListener('change', function () {
-    //     var reader = new FileReader();
-    //     reader.onload = function () {
-    //         var arrayBuffer = this.result;
-    //         var uint8View = new Uint8Array(arrayBuffer);
-    //         console.log(arrayBuffer);
-    //         console.log(uint8View[0]);
-    //         gameboy.loadRom(uint8View)
-    //     }
-    //     reader.readAsArrayBuffer(this.files[0]);
-    // }, false);
-
     const imageData = ctx.createImageData(DISPLAY_WIDTH, DISPLAY_WIDTH)
     vBuffer = new Uint32Array(imageData.data.buffer)
     aBuffer = []
@@ -69,11 +57,12 @@
 
     let frameNumber = 0
     let frameTimeStamp = 0
-    function frame(timestamp) {
+
+    let lastFrame = performance.now()
+    function frame() {
         nextFrameTimeStamp = performance.now()
         let frameTime = nextFrameTimeStamp - frameTimeStamp
         if (frameTime < 16 || frameTime > 18)
-        console.log('frame:', frameTime)
         frameTimeStamp = nextFrameTimeStamp
     
         frameNumber = frameNumber + 1
@@ -86,9 +75,11 @@
 
         ctx.putImageData(imageData, 0, 0)
 
-        window.requestAnimationFrame(frame)
+        nextFrame = lastFrame + (1000 / 60)
+        lastFrame = nextFrame
+        setTimeout(frame, nextFrame - performance.now())
     }
-    window.requestAnimationFrame(frame)
+    setTimeout(frame, 0)
 
     window.onload = async function () {
         audioContext = new AudioContext();
